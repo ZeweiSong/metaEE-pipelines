@@ -1,0 +1,29 @@
+### READ ME FIRST ###
+### YOU HAVE TO READ THROUGH THE FOLLOWING TEXT BEFORE CONTINUE ###
+1. Think very carefully before starting your snakemake pipeline.
+2. You need to choose the correct pipeline based on the library prep methods.
+3. Are you using illumina's MiSeq or HiSeq, and PE250 or PE300? If yes, go to 4. If no, go to 5.
+4. Use the pipeline under illumina_pe/
+5. Are you using DNBSeq's platform, either BGISEQ or MGISEQ? If yes, go to 6. If no, there is currently no pipeline for your data.
+6. Are you using short primers with barcode (developed by metaEE)? If yes, go to 7. If no, go to 8.
+7. Are you using PE200 or SE400? If PE200, go to dnbseq/short/pe/, if SE400, go to dnbseq/short/se/
+8. Are you using a long primer set with DNB's adaptor, go to 9.
+9. Are you using PE200 or SE400? If PE200, go to dnbseq/long/pe/, if SE400, go to dnbseq/long/se/
+10. Now that you should see a snakemake file under your current folder, as well as a config.yaml.
+11. Go to your working directory, create a new folder as your working folder.
+12. Use "ln -s" to soft-link the correct snakemake file to your working folder.
+13. USe "cp" to copy the correct config.yaml file to your working folder.
+14. Create a folder named "data". Then create a folder named "data/samples".
+15. Use "ln -s" to soft-link all your data files to the folder "data/samples".
+16. Open config.yaml and read through the first comment section, make sure you are using the right parameter set.
+17. Test run snakemake use dry run (-n).
+
+### Q&A ###
+Q1: What if I want to test different parameters using a same pipeline?
+A1: We recommend that for every parameter testing, create a new folder under your working folder. Then copy the config.yaml to the new folder and change correspondingly. You can then go to the new folder and refer to the same snakemake file.
+
+Q2: What is the best way to process a large dataset?
+A1: Although you entire dataset could be large, an individual sample always is not larger than 100MB. Our pipeline handle the computing at a per sample based logic, so there is little chance for you to run out of memory. Most of the time, we execute the pipeline under the testing node, using "-j 24". If you want to submit your task to the queue, check the .sh file under each folder.
+
+Q3: What is the folder "denovo/"?
+A3: This will be the place for denovo pipelines. But since we are using closed-ref for large project, you are very unlikely to use a denovo aka two-steps closed-ref pipeline.
