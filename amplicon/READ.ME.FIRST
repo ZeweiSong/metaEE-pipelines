@@ -7,7 +7,7 @@
 5. Are you using DNBSeq's platform, either BGISEQ or MGISEQ? If yes, go to 6. If no, there is currently no pipeline for your data.
 6. Are you using short primers with barcode (developed by metaEE)? If yes, go to 7. If no, go to 8.
 7. Are you using PE200 or SE400? If PE200, go to dnbseq/short/pe/, if SE400, go to dnbseq/short/se/
-8. Are you using a long primer set with DNB's adaptor, go to 9.
+8. Are you using a long primer set with DNB's adaptor? If yes, go to 9.
 9. Are you using PE200 or SE400? If PE200, go to dnbseq/long/pe/, if SE400, go to dnbseq/long/se/
 10. Now that you should see a snakemake file under your current folder, as well as a config.yaml.
 11. Go to your working directory, create a new folder as your working folder.
