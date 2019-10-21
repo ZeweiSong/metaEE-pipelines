@@ -87,23 +87,69 @@ rule quality:
 	run:
 		shell('vsearch --fastq_filter {input.merged} --fastaout {output.merged} --fastq_maxee 1 --fastq_minlen 100 --fasta_width 0\
 		--fastq_ascii {params.ascii} --fastq_stripleft {params.trim_fw} --fastq_stripright {params.trim_rv}  --threads {threads} 2>  {log}')
+
+# Combine all reads into one
+rule combine:
+	input:
+		samples = expand(workpath + 'qc_reads/{sample}.fa', sample=SAMPLES)
+	output:
+		merged = workpath + combine/merged.fa'
+	log:
+		workpath + 'logs/combine/merged.log'	
+	threads: 1
+	run:
+		shell('cat {input.samples} > {output.merged}')
+# Dereplicate
+rule dereplicate:
+	input: 
+		merged = workpath + combine/merged.fa'
+	output:
+		derep = workpath + 'dereplicate/merged.fa'
+	log:
+		workpath + 'logs/dereplicate/merged.log'
+	threads: 2
+	run:
+		shell('vsearch --derep_fulllength {input.merged} --output {output.derep} --sizeout --fasta_width 0 --threads {threads} 2> {log}')
+# Chimera check
+rule chimera:
+	input: 
+		derep = workpath + dereplicate/merged.fa'
+	output:
+		derep = workpath + 'chimera/merged.fa'
+	log:
+		workpath + 'logs/chimera/merged.log'
+	params:
+		db = config['database']['fasta']
+	threads: 2
+	run:
+		shell('vsearch --uchime_ref {input.derep} --db {params.db} --nonchimeras {output.derep} --sizeout --fasta_width 0 --threads {threads} 2> {log}')
+# Cluster
+	input:
+		derep = workpath + 'chimera/merged.fa'
+	output:
+		cluster = workpath + 'cluster/centroids.fa'
+	log:
+		workpath + 'logs/cluster/merged.log'
+	params:
+		id   = config['align']['id']
+	threads: 1
+	run:
+		shell('vsearch --cluster_size {input.derep} --id {params.id} --centroids {output.cluster} --threads {threads} --fasta_width 0')
 	
-# Align reads to the database
+# Align reads to the centroids
 rule align:
 	input:
-		merged = workpath + 'qc_reads/{sample}.fa'
+		qc_reads = workpath + 'qc_reads/{sample}.fa',
+		cluster = workpath + 'cluster/centroids.fa'
 	output:
-		merged = workpath + 'alignments/{sample}.b6'
+		tsv = workpath + 'otutable.tsv'
 	params:
-		acx  = config['database']['acx'],
-		edx  = config['database']['edx'],
-		mode = config['align']['mode'],
 		id   = config['align']['id']
 	log:
-		workpath + 'logs/alignments/{sample}.log'
+		workpath + 'logs/align/merged.log'
 	threads: 4
 	run:
-		shell('burst12 -q {input.merged} -a {params.acx} -r {params.edx} -o {output.merge} -i {params.id} -m {params.mode} -t {threads} > {log}')
+		shell('vsearch --usearch_global {input.qc_reads} --db {input.cluster} --id {params.id} --otutabout {output.tsv} --threads {threads} > {log}')
 
 # Count reads retention in the above steps
 rule count:
@@ -116,21 +162,6 @@ rule count:
 	run:
 		shell('echo {params.sn} > {output}')
 		shell('amplicon_countRetention.py -d {input.quality_fw} -q {input.quality_fw} -a {input.align_fw} >> {output}')
-
-# Combine alignments using winner take all method
-rule winnerTakeAll:
-	input:
-		merged = workpath + 'alignments/{sample}.b6'
-	output:
-		tsv		= workpath + 'profiles/{sample}.tsv',
-		biom	= workpath + 'profiles/{sample}.biom'
-	params:
-		sampleName='{sample}'
-	log:
-		workpath + 'logs/winnerTakeAll/{sample}.log'
-	run:
-		shell('amplicon_winnerTakeAll.py -i {input.merged} -sn {params.sampleName} -t {output.tsv} -g > {log}')
-		shell('biom convert -i {output.tsv} -o {output.biom} --to-json')		
 
 # Concatenate all profiles into one
 # Add the taxonomy, and write to biom and tsv file	
