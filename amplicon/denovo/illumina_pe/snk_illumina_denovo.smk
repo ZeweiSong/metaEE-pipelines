@@ -49,10 +49,8 @@ SAMPLES = {i:i for i in SAMPLES}
 # Target of this pipeline: put all samples in one profile, either in tsv or biom
 rule target:
 	input:
-		workpath + 'combined.biom',
-		workpath + 'combined.taxa.biom',
-		workpath + 'combined.taxa.tsv',
-		workpath + 'count.txt'
+		biom_taxa = workpath + 'combined.taxa.biom',
+		tsv_taxa  = workpath + 'combined.taxa.tsv'
 
 # We merge R1 and R2 together for a longer asselmby. Usually, variable region in 16S is short enough for effective merging. If it is too long, use the ITS snake instead.
 rule pear:
@@ -142,44 +140,26 @@ rule align:
 		qc_reads = workpath + 'qc_reads/{sample}.fa',
 		cluster = workpath + 'cluster/centroids.fa'
 	output:
-		tsv = workpath + 'otutable.tsv'
+		biom = workpath + 'otutable.biom'
 	params:
 		id   = config['align']['id']
 	log:
 		workpath + 'logs/align/merged.log'
 	threads: 4
 	run:
-		shell('vsearch --usearch_global {input.qc_reads} --db {input.cluster} --id {params.id} --otutabout {output.tsv} --threads {threads} > {log}')
+		shell('vsearch --usearch_global {input.qc_reads} --db {input.cluster} --id {params.id} --biomout {output.biom} --threads {threads} > {log}')
 
-# Count reads retention in the above steps
-rule count:
-	input:
-		quality_fw	=	workpath + 'qc_reads/{sample}.fa'
-		align_fw	=	workpath + 'alignments/{sample}.b6'
-	output: workpath + 'count/{sample}.count'
-	params:
-		sn ='{sample}'
-	run:
-		shell('echo {params.sn} > {output}')
-		shell('amplicon_countRetention.py -d {input.quality_fw} -q {input.quality_fw} -a {input.align_fw} >> {output}')
-
-# Concatenate all profiles into one
 # Add the taxonomy, and write to biom and tsv file	
-rule concat:
+rule taxonomy:
 	input:
-		biom  = expand(workpath + 'profiles/{sample}.biom', sample=SAMPLES),
-		count = expand(workpath + 'count/{sample}.count', sample=SAMPLES)
+		biom  = workpath + 'otutable.biom'
 	output:
-		combined  = workpath + 'combined.biom',
 		biom_taxa = workpath + 'combined.taxa.biom',
-		tsv_taxa  = workpath + 'combined.taxa.tsv',
-		count 	  = workpath + 'count.txt'
+		tsv_taxa  = workpath + 'combined.taxa.tsv'
 	params:
 		taxa=config['database']['tax']
 	log:
 		workpath + 'logs/concat/concate.log'
 	run:
-		shell('amplicon_concat.py -i {input.biom} -biom_out {output.combined} > {log}')
-		shell('biom add-metadata -i {output.combined} -o {output.biom_taxa} --observation-metadata-fp {params.taxa} --observation-header OTUID,taxonomy --output-as-json --sc-separated taxonomy')
+		shell('biom add-metadata -i {input.biom} -o {output.biom_taxa} --observation-metadata-fp {params.taxa} --observation-header OTUID,taxonomy --output-as-json --sc-separated taxonomy')
 		shell('biom convert -i {output.biom_taxa} -o {output.tsv_taxa} --to-tsv --header-key taxonomy')
-		shell('cat {input.count} > {output.count}')
