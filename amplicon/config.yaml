@@ -7,20 +7,32 @@
 # part below (or ask someone from metaEE, buy him/her a 
 # coffee too).
 
-primers:
-    fw: GTGARTCATCRARTYTTTG
-    rv: CCTSCSCTTANTDATATGC
-trim:
+project: some_project # project name, this is used to name the final output files.
+
+workpath: its1/ # Your working directory to put all intermedia files
+
+primers: # Check the primers more than one time
+    fw: GGTCATTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCCGTAGGTGAACCTGCGGAAGGATCATT
+    rv: TTYRCKRCGTTCTTCATCG
+
+trim: # This applies to ITS2 region for now, since UNITE chop a 40bp variable region using ITSx
     fw: 0
     rv: 0
+
 database: #path/to/burst/database
     acx: /hwfssz1/ST_META/EE/bin/database/ee_its_database.acx
     edx: /hwfssz1/ST_META/EE/bin/database/ee_its_database.edx
     tax: /hwfssz1/ST_META/EE/bin/database/ee_its_taxonomy.txt
-align:
-    mode: BEST 
-    id: 0.97
+
+align: # These are the parameters for Burst, the aligner by Dan Knights lab.
+    mode: BEST # Choose from BEST (the first top hit), ALLPATHS (all top hits), and FORAGE (all hit pass the threshold)
+    id: 0.97 # You know this number
+
 extension: .fq.gz
+
+ascii: 33 # Choose from 33 (most of the case) or 64 (lucky you!)
+
+
 # Align parameters for Burst:   
 # Choose from FORAGE, ALLPATHS, BEST, or other mode option in Burst
 

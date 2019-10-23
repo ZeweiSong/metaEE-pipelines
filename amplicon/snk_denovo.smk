@@ -6,15 +6,18 @@
 #############################################
 
 # This is a Snakemake pipeline for processing amplicon sequencing data based on 
-# MiSeq or HiSeq pair-end method. The most popular protocl for illumina's sequencer is
-# to use a (very) long primer, which contains the sequence of adaptor to construt the library
-# In this case, Read1 will always starting from the forward primer, and vice versa for Read2.
-# The pro is that you know what you are expecting in R1 and R2.
-# the con is that you have to perfrom PCR with two long primers, and this sometimes can cause
-# trouble.
+# DNBSeq(TM) pair-end method. 
+# Most popular protocl for sequecning amplicon is to use a (very) long primer, 
+# which contains the sequence of library adaptor. However, long primer may cause
+# problems every long primer inherent, and you need two step PCR for this.
+# In our case, we use a short primer with 6 bp barcode at the end. The amplicons
+# can be treated as normal insert. In this way, we can use the PCR-free method to
+# construct the library. By sacraficing a bit read length, we can achieve a ultra
+# high throughput in a single run (~2000 samples).
 
-# This protocol goes to the path of "closed-reference", which means that we only align reads
-# to known species. We are not about the argue why we prefer closed-ref than de novo here, but
+# This protocol goes to the path of "denovo", which means that we will guess the OTUs first. 
+# We will then assign taxonomy to each OTU. 
+# We are not about the argue why we prefer closed-ref than de novo here, but
 # one short answer is that closed-ref make independent projects accumulable (this is the right word?).
 
 # You will need the sequence of the forward and reverse primers (or the conservative region
@@ -26,15 +29,16 @@
 # The sample file should be in the format [SampleName].[ReadDirection].fq.gz, i.e. sampleA.r1.fq.gz sampleA.r2.fq.gz
 # Beward that "." should not be used to name your samples as it is a delimiter to identify sample names.
 # You can change the file extension in the config file.
-# Put all sample files in its1/samples
+# Put all sample files in workpath/samples
 # A sample should have two corresponding files.
 
-configfile: 'config_illumina_pe.yaml'
+configfile: 'config.yaml'
 
 import os
 import sys
 SAMPLES = []
 workpath = config['workpath']
+project = config['project']
 samplepath = workpath + 'samples/'
 for file in os.listdir(samplepath): # List all files under the folder. For PE data, one samples correspond to two files.
 	string = file.split('.')
@@ -46,13 +50,19 @@ for file in os.listdir(samplepath): # List all files under the folder. For PE da
 SAMPLES = tuple(set(SAMPLES))
 SAMPLES = {i:i for i in SAMPLES}
 
+fw=config['primers']['fw']
+rv=config['primers']['rv']
+base = {'A':'T','T':'A','C':'G','G':'C','R':'Y','Y':'R','K':'M','M':'K','S':'S','W':'W','B':'V','V':'B','D':'H','H':'D','N':'N'}
+frc = ''.join([base[i] for i in list(fw)[0][::-1]])
+rrc = ''.join([base[i] for i in list(rv)[0][::-1]])
+
 # Target of this pipeline: put all samples in one profile, either in tsv or biom
 rule target:
 	input:
-		biom_taxa = workpath + 'combined.taxa.biom',
-		tsv_taxa  = workpath + 'combined.taxa.tsv'
+		biom_taxa = workpath + project + '.taxa.biom',
+		tsv_taxa  = workpath + project + '.taxa.tsv'
 
-# We merge R1 and R2 together for a longer asselmby. Usually, variable region in 16S is short enough for effective merging. If it is too long, use the ITS snake instead.
+# We merge R1 and R2 together for a longer asselmby.
 rule pear:
 	input:
 		r1 = lambda wildcards: samplepath + SAMPLES[wildcards.sample] + '.r1.fq.gz',
@@ -69,27 +79,53 @@ rule pear:
 	run:
 		shell('pear -f {input.r1} -r {input.r2} -o {params.sn} -b 64 -k -j {threads} > {log}')
 
-# Remove low quality reads, and reverse compliment R2 sequences
-rule quality:
+# Remove the conservative regions. Usually, you just need to remove the two primers. But for some cases, the region has to be longer (like ITS1).
+rule cutadapt:
 	input:
 		merged	= workpath + 'pear/{sample}.assembled.fastq'
 	output:
-		merged = workpath + 'qc_reads/{sample}.fa'
-	log:
-		workpath + 'logs/qc_reads/{sample}.log'
+		r1 = workpath + 'cutadapt/{sample}.r1.fq',
+		r2 = workpath + 'cutadapt/{sample}.r2.fq'
 	params:
-		ascii = config['ascii']
+		fw=config['primers']['fw'],
+		rv=config['primers']['rv']
+		fwrc=frc
+		rvrc=rrc
+		ascii=config['ascii']
+	threads: 2
+	log: workpath + 'logs/cutadapt/{sample}.log'
+	run:
+		shell('cutadapt {input.merged} -g {params.fw} -a {params.rvrc} -n 2 --discard-untrimmed -e 0.1 -m 100 --quality-base {params.ascii} -j {threads} -o {output.r1} > {log}')
+		shell('cutadapt {input.merged} -g {params.rv} -a {params.fwrc} -n 2 --discard-untrimmed -e 0.1 -m 100 --quality-base {params.ascii} -j {threads} -o {output.r2} >> {log}')
+
+# Remove low quality reads, and reverse compliment R2 sequences
+rule quality:
+	input:
+		r1 = workpath + 'cutadapt/{sample}.r1.fq',
+		r2 = workpath + 'cutadapt/{sample}.r2.fq'
+	output:
+		r1 = workpath + 'quality/{sample}.r1.fa',
+		r2 = workpath + 'quality/{sample}.r2.fa',
+		combine = temp(workpath + 'relabel/{sample}.fa')
+	log:
+		workpath + 'logs/quality/{sample}.log'
+	params:
+		ascii = config['ascii'],
 		trim_fw = config['trim']['fw'],
-		trim_rv = config['trim']['rv']
+		trim_rv = config['trim']['rv'],
+		sn = '{sample}'
 	threads: 1
 	run:
-		shell('vsearch --fastq_filter {input.merged} --fastaout {output.merged} --fastq_maxee 1 --fastq_minlen 100 --fasta_width 0\
+		shell('vsearch --fastq_filter {input.merged} --fastaout {output.r1} --fastq_maxee 1 --fastq_minlen 100 --fasta_width 0\
 		--fastq_ascii {params.ascii} --fastq_stripleft {params.trim_fw} --fastq_stripright {params.trim_rv}  --threads {threads} 2>  {log}')
+		shell('vsearch --fastq_filter {input.merged} --fastaout_rev {output.r2} --fastq_maxee 1 --fastq_minlen 100 --fasta_width 0\
+		--fastq_ascii {params.ascii} --fastq_stripright {params.trim_fw} --fastq_striplet {params.trim_rv}  --threads {threads} 2>>  {log}')
+		shell('cat {output.r1} {output.r2} > - | vsearch --fastq_filter - --fastaout {output.combine} --relabel "sample={params.sn};r1_"')
 
 # Combine all reads into one
 rule combine:
 	input:
-		samples = expand(workpath + 'qc_reads/{sample}.fa', sample=SAMPLES)
+		samples = expand(workpath + 'relabel/{sample}.fa', sample=SAMPLES)
 	output:
 		merged = workpath + combine/merged.fa'
 	log:
@@ -97,6 +133,7 @@ rule combine:
 	threads: 1
 	run:
 		shell('cat {input.samples} > {output.merged}')
+		
 # Dereplicate
 rule dereplicate:
 	input: 
