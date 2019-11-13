@@ -209,7 +209,9 @@ rule count:
 		merged	= workpath + 'alignment/{sample}.merged.b6',
 		fwrv	= workpath + 'alignment/{sample}.fwrv.b6'
 	output:
+		count = workpath + 'count/{sample}.count'
 	run:
+		shell('r1fw=$(wc -l {input.r1fw} | awk '{print $1}');let r1fw=r1fw/4')
 		
 rule concat:
 	input:
