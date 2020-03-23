@@ -48,8 +48,8 @@ rule cutadapt:
 		workpath + 'logs/cutadapt/{sample}.log'
 	threads: 2
 	run:
-		shell('cutadapt {input.r1} {input.r2} -g {params.fw} -a {params.rvrc} -G {params.rv} -A {params.fwrc} -n 2 --discard-untrimmed -e 0.1 -m 100 --quality-base {params.ascii} -j {threads} -o {output.r1fw} -p {output.r2rv} > {log}')
-		shell('cutadapt {input.r1} {input.r2} -g {params.rv} -a {params.fwrc} -G {params.fw} -A {params.rvrc} -n 2 --discard-untrimmed -e 0.1 -m 100 --quality-base {params.ascii} -j {threads} -o {output.r1rv} -p {output.r2fw} >> {log}')
+		shell('cutadapt {input.r1} {input.r2} -g {params.fw} -a {params.rvrc} -G {params.rv} -A {params.fwrc} -n 2 --discard-untrimmed -e 0.1 -m 75 --quality-base {params.ascii} -j {threads} -o {output.r1fw} -p {output.r2rv} > {log}')
+		shell('cutadapt {input.r1} {input.r2} -g {params.rv} -a {params.fwrc} -G {params.fw} -A {params.rvrc} -n 2 --discard-untrimmed -e 0.1 -m 75 --quality-base {params.ascii} -j {threads} -o {output.r1rv} -p {output.r2fw} >> {log}')
 
 rule quality_control:
 	input:
