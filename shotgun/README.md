@@ -33,8 +33,10 @@ Remember not to use "_", **under score** to name your samples.
 If everything is set up right, then:
 
 ```
+# This is a dry-run to check the pipeline.
 snakemake -s snk_qc.smk -np
 
+# This is the real run.
 snakemake -s snk_qc.smk -p -j 12
 ```
 
