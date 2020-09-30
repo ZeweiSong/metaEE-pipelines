@@ -25,6 +25,7 @@ We will merge pair end reads and filter them for high quality reads. Read pairs 
 Put your raw sequence files under the path `data/samples`. Rename your file following this rule:
 
 `SampleName_1.fq.gz`
+
 `SampleName_2.fq.gz`
 
 Remember not to use "_", **under score** to name your samples.
@@ -32,3 +33,9 @@ Remember not to use "_", **under score** to name your samples.
 ## Solving profiles
 
 After QC, put the files you want to align under the folder `data/maxee_subsamples`
+
+We recommend to subsample 1M reads per sample since aligning is a slow process. You can easily use:
+
+`seqtk sample -s 42 data/maxee/SampleName.merged.fa 1000000 > data/maxee_subsamples/SampleName.fna`
+
+Then, create softlinks of all BURST15 indexes under the folder `database/`
