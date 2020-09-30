@@ -1,4 +1,4 @@
-# 2019/09/17 ZS This is our semi-final pipeline for quality control of sequencing data.
+# 2019/09/17, 2020/8/18 ZS This is our almost-final pipeline for quality control of sequencing data.
 # This pipeline is used generaly on shotgun data where DNA fragments were randomly drawed.
 # QCed shotgun data can go down to multilpe analysis pathways. So it is better to
 # make a stand alone QC pipeline.
@@ -8,14 +8,15 @@
 #				sample-name-XXX_1.fq.gz
 #				sample-name-XXX_2.fq.gz
 # Remember that "_" is used to identify the correct R1 and R2 file, as well as the sample name.
-# Put (or ln -s) all raw data into data/sample
+# You should not use "_" to name your samples.
+# Put (or ln -s) all raw data into the path defined in the variable "filepath" below.
 
-config = 'config.yaml'
+configfile: 'config.yaml'
 
 import os
 import sys
 SAMPLES = {}
-filepath = 'data/sample/'
+filepath = 'data/samples/'
 for file in os.listdir(filepath):
 		sample_name = file.split('_')[0]
 		SAMPLES[sample_name] = SAMPLES.get(sample_name, []) + [filepath + file]
@@ -34,74 +35,87 @@ rule target:
 	input:
 		report='data/count_report.tsv'
 
+# Attemp to merge R1 and R2 reads, reads not assembled is kept.
 rule pear:
 	input:
 		lambda wildcards: SAMPLES[wildcards.sample] # a lambda expression that "sample" is used as wildcards to refer to the value of the dictionary SAMPLES
 	output:
-		assembled	='data/pear/{sample}.assembled.fastq',
-		forward		='data/pear/{sample}.forward.fastq',
-		reverse		='data/pear/{sample}.reverse.fastq',
-		discard		='data/pear/{sample}.discard.fastq'
+		assembled	=	temp('data/pear/{sample}.assembled.fastq'),
+		fwd			=	temp('data/pear/{sample}.unassembled.forward.fastq'),
+		rev			=	temp('data/pear/{sample}.unassembled.reverse.fastq'),
+		discard		=	temp('data/pear/{sample}.discarded.fastq')
 	params:
-		name = '{sample}'
+		name = '{sample}',
 		phred = config['phred']
 	threads: 4
-	log: 'log/pear/{sample}.pear.log'
+	log: 'log/qc/pear/{sample}.pear.log'
 	run:
-		shell('pear -f {input[0]} -r {input[1]} -o {params.name} -k -b {params.phred} -j {threads} > {log}')
+		shell('pear -f {input[0]} -r {input[1]} -o data/pear/{params.name} -k -b {params.phred} -j {threads} > {log}')
 
-# For unassembled files, remove adaptors from their tails.
+# For unassembled R1 and R2 reads, remove potential adaptors from their tails.
+# Convert the two files into one interleaved fastq file.
+# Adaptors for DNBSEQ are used here.
 rule cutadapt:
 	input:
-		forward		='data/pear/{sample}.forward.fastq',
-		reverse		='data/pear/{sample}.reverse.fastq'
+		fwd		= 	'data/pear/{sample}.unassembled.forward.fastq',
+		rev		= 	'data/pear/{sample}.unassembled.reverse.fastq'
 	output:
-		pair		='data/cutadapt/{sample}.cutadapt.fq'
+		fwd		=	temp('data/cutadapt/{sample}.cutadapt.forward.fq'),
+		rev		=	temp('data/cutadapt/{sample}.cutadapt.reverse.fq'),
+		inter	=	temp('data/temp/{sample}.interleaved.fq')
 	params:
 		fw = 'AAGTCGGAGGCCAAGCGGTCTTAGGAAGACAA',
 		rv = 'AAGTCGGATCGTAGCCATGTCGTTCTGT',
 		phred = config['phred']
 	threads: 4
-	log: 'log/cutadapt/{sample}.cutadapt.log'
+	log: 'log/qc/cutadapt/{sample}.cutadapt.log'
 	run:
-		shell('cutadapt {input.forward} {input.reverse} -a {params.fw} -A {params.rv} --interleaved {output.pair} -m 50 --quality-base {params.phred} -j {threads} > {log}')
+		
+		shell('cutadapt {input.fwd} {input.rev} -a {params.fw} -A {params.rv} -o {output.fwd} -p {output.rev} -m 50 --quality-base {params.phred} -j {threads} > {log}')
+		shell('seqtk mergepe {output.fwd} {output.rev} > {output.inter}')
 
 # For assembled reads, discard if maxee > 1
 # For unassembled read pair, truncate until maxee <= 1, keep only pair
 rule maxee:
 	input:
 		assembled	='data/pear/{sample}.assembled.fastq',
-		pair		='data/cutadapt/{sample}.cutadapt.fq'
+		pair		='data/temp/{sample}.interleaved.fq'
 	output:
-		assembled	='data/maxee/{sample}.merged.fa.gz',
-		pair		='data/maxee/{sample}.pair.fa.gz'
+		assembled	='data/maxee/{sample}.merged.fa',
+		pair		='data/maxee/{sample}.pair.fa'
 	params:
 		phred = config['phred']
 	threads: 4
-	log: 'log/maxee/{sample}.maxee.log'
+	log: 'log/qc/maxee/{sample}.maxee.log'
 	run:
-		shell('vsearch --fastq_filter {input.assembled} --fastq_maxee 1 --fastq_minlen 100 --fastq_maxns 0 --fastaout - --fasta_width 0 --fastq_ascii {params.phred} --threads {threads} 2> {log} | gzip -c > {output.assembled}')
-		shell('vsearch --fastq_filter {input.pair} --fastq_truncee 1 --fastq_minlen 100 --fastq_maxns 0 --fastaout - --fasta_width 0 --fastq_ascii {params.phred} --threads {threads} 2>> {log} | seqtk dropse | gzip -c > {output.pair}')
+		shell('vsearch --fastq_filter {input.assembled} --fastq_maxee 1 --fastq_minlen 100 --fastq_maxns 0 --fastaout {output.assembled} --fasta_width 0 --fastq_ascii {params.phred} --threads {threads} 2> {log}')
+		shell('vsearch --fastq_filter {input.pair} --fastq_truncee 1 --fastq_minlen 100 --fastq_maxns 0 --fastaout - --fasta_width 0 --fastq_ascii {params.phred} --threads {threads} 2>> {log} | seqtk dropse > {output.pair}')
 
 # Count reads for every step
 rule report:
 	input:
-		raw			='data/sample/{sample}.fq.gz',
+		raw			='data/samples/{sample}_1.fq.gz',
 		merged		='data/pear/{sample}.assembled.fastq',
-		merged_qc	='data/maxee/{sample}.merged.fa.gz',
-		paired		='data/pear/{sample}.forward.fastq',
-		paired_qc	='data/maxee/{sample}.pair.fa.gz'
+		merged_qc	='data/maxee/{sample}.merged.fa',
+		paired		='data/pear/{sample}.unassembled.forward.fastq',
+		paired_qc	='data/maxee/{sample}.pair.fa'
 	output:
-		count		='data/count/{sample}.count'
+		counter		='data/count/{sample}.count'
 	params:
 		name='{sample}'
 	run:
-		 shell("c1=$(($(gunzip -c {input.raw} | wc -l | awk '{{print $1}}')/4));c2=$(($(wc -l {input.merged} | awk '{{print $1}}')/4));c3=$(($(gunzip -c {input.merged_qc} | wc -l | awk '{{print $1}}')/2));c4=$(($(wc -l {input.paired} | awk '{{print $1}}')/4));c5=$(($(gunzip -c {input.paired_qc} | wc -l | awk '{{print $1}}')/4));echo -e {params.name} '\t' $c1 '\t' $c2 '\t' $c4 '\t' $c3 '\t' $c5 > {output.count}")
+		 shell("c1=$(($(gunzip -c {input.raw} | wc -l | awk '{{print $1}}')/4)); \
+				c2=$(($(wc -l {input.merged} | awk '{{print $1}}')/4)); \
+				c3=$(($(wc -l {input.merged_qc} | awk '{{print $1}}')/2)); \
+				c4=$(($(wc -l {input.paired} | awk '{{print $1}}')/4)); \
+				c5=$(($(wc -l {input.paired_qc} | awk '{{print $1}}')/4)); \
+				echo -e {params.name} '\t' $c1 '\t' $c2 '\t' $c3 '\t' $c4 '\t' $c5 > {output.counter}")
 
 rule concat:
 	input:
-		count=expand('data/count/{sample}.count', sample=SAMPLES)
+		counter		=	expand('data/count/{sample}.count', sample=SAMPLES)
 	output:
 		report='data/count_report.tsv'
 	run:
-		cat {input.count} > {output.report}
+		shell("echo -e sample'\t'raw'\t'merged'\t'merged_QC'\t'paired'\t'paired_QC > {output.report}")
+		shell('cat {input.counter} >> {output.report}')

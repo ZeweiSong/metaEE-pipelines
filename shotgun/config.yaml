@@ -1,1 +1,10 @@
+# Parameters for qc
 phred: 33
+adaptors: # There are adaptors for DNBSeq
+    r1: AAGTCGGAGGCCAAGCGGTCTTAGGAAGACAA
+    r2: AAGTCGGATCGTAGCCATGTCGTTCTGT
+# Parameters for profiling
+db_path: database/
+taxonomy: taxonomy.txt # taxonomy combines gtdb and ncbi fungi
+id: 0.97 # BURST15 index is built for id >= 0.97, what esle do you need?
+mode: ALLPATHS # choose from ALLPATHS or FORAGE
