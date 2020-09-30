@@ -30,6 +30,14 @@ Put your raw sequence files under the path `data/samples`. Rename your file foll
 
 Remember not to use "_", **under score** to name your samples.
 
+If everything is set up right, then:
+
+```
+snakemake -s snk_qc.smk -np
+
+snakemake -s snk_qc.smk -p -j 12
+```
+
 ## Solving profiles
 
 After QC, put the files you want to align under the folder `data/maxee_subsamples`
@@ -38,4 +46,18 @@ We recommend to subsample 1M reads per sample since aligning is a slow process. 
 
 `seqtk sample -s 42 data/maxee/SampleName.merged.fa 1000000 > data/maxee_subsamples/SampleName.fna`
 
+You files should ends with .fna, any string before it will be recognize as sample name.
+
 Then, create softlinks of all BURST15 indexes under the folder `database/`
+
+Let's check for dry-run again:
+
+```
+snakemake -s snk_profile.smk -np
+```
+
+If everything goes right, lean back and run:
+
+```
+snakemake -s snk_profile.smk -p -j 12
+```
