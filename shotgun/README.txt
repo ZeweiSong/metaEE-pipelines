@@ -1,4 +1,4 @@
-# BIOMASS: Bayesian Inference Of Multi-Alignments on genome SetS <h1>
+# BIOMASS: Bayesian Inference Of Multi-Alignments on genome SetS
 
 What is it?
 It is a pipeline for solving microbial community profile from shotgun sequencing data.
