@@ -11,8 +11,8 @@ It is possible that the origin probability of some target be zero, in which case
 
 ## How to use it?
 This pipeline contains two sankemake files, snk_qc.smk and snk_profile.smk
-* snk_qc.smk: Merge the pair-end read raw sequnence data, quality filter into clean data.
-* snk_profile.smk: Do the heavy duty aligning, calculate profiles for all samples.
+* `snk_qc.smk`: Merge the pair-end read raw sequnence data, quality filter into clean data.
+* `snk_profile.smk`: Do the heavy duty aligning, calculate profiles for all samples.
 
 Since aligning to all genomes takes a decent time (in days), it is wise to separate QC and profiling into two steps.
 
