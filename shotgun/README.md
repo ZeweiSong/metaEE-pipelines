@@ -17,3 +17,18 @@ This pipeline contains two sankemake files, snk_qc.smk and snk_profile.smk
 Since aligning to all genomes takes a decent time (in days), it is wise to separate QC and profiling into two steps.
 
 After QC, we recommend to draw 1M reads from each sample for alignments. We only use merged reads for aligning, so draw from .merged.fa files.
+
+## Quality control
+
+We will merge pair end reads and filter them for high quality reads. Read pairs that can not be merged, are stored as interleaved FASTA format to reduce the number of files. We only use merged reads for aligning.
+
+Put your raw sequence files under the path `data/samples`. Rename your file following this rule:
+
+`SampleName_1.fq.gz`
+`SampleName_2.fq.gz`
+
+Remember not to use "_", **under score** to name your samples.
+
+## Solving profiles
+
+After QC, put the files you want to align under the folder `data/maxee_subsamples`
