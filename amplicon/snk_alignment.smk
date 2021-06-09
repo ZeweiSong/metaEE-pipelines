@@ -12,7 +12,7 @@ for file in os.listdir(workpath + 'samples/'): # List all files under the folder
 	if len(string) != 4: # You have to makesure that "." is not used in naming your samples. All files have the suffix .r1.fq.gz or .r2.fq.gz
 		print('{0} contains illegal naming style, please check.'.format(file))
 		sys.exit()
-	esle:
+	else:
 		SAMPLES.append(string[0])
 SAMPLES = tuple(set(SAMPLES))
 SAMPLES = {i:i for i in SAMPLES}
@@ -20,14 +20,14 @@ SAMPLES = {i:i for i in SAMPLES}
 fw=config['primers']['fw']
 rv=config['primers']['rv']
 base = {'A':'T','T':'A','C':'G','G':'C','R':'Y','Y':'R','K':'M','M':'K','S':'S','W':'W','B':'V','V':'B','D':'H','H':'D','N':'N'}
-frc = ''.join([base[i] for i in list(fw)[0][::-1]])
-rrc = ''.join([base[i] for i in list(rv)[0][::-1]])
+frc = ''.join([base[i] for i in list(fw)[::-1]])
+rrc = ''.join([base[i] for i in list(rv)[::-1]])
 
 rule target:
 	input:
-		combine_biom			= workpath + 'concat/' + project + biom
-		comebin_taxa_biom		= workpath + 'concat/' + project + taxa.biom
-		combine_taxa_tsv		= workpath + 'concat/' + project + taxa.tsv
+		combine_biom			= workpath + 'concat/' + project + '.biom',
+		comebin_taxa_biom		= workpath + 'concat/' + project + '.taxa.biom',
+		combine_taxa_tsv		= workpath + 'concat/' + project + '.taxa.tsv'
 
 rule cutadapt:
 	input:
@@ -48,8 +48,8 @@ rule cutadapt:
 		workpath + 'logs/cutadapt/{sample}.log'
 	threads: 2
 	run:
-		shell('cutadapt {input.r1} {input.r2} -g {params.fw} -a {params.rvrc} -G {params.rv} -A {params.fwrc} -n 2 --discard-untrimmed -e 0.1 -m 75 --quality-base {params.ascii} -j {threads} -o {output.r1fw} -p {output.r2rv} > {log}')
-		shell('cutadapt {input.r1} {input.r2} -g {params.rv} -a {params.fwrc} -G {params.fw} -A {params.rvrc} -n 2 --discard-untrimmed -e 0.1 -m 75 --quality-base {params.ascii} -j {threads} -o {output.r1rv} -p {output.r2fw} >> {log}')
+		shell('cutadapt {input.r1} {input.r2} -g {params.fw} -a {params.rvrc} -G {params.rv} -A {params.fwrc} --discard-untrimmed -n 2 -e 0.1 -m 75 --quality-base {params.ascii} -j {threads} -o {output.r1fw} -p {output.r2rv} > {log}')
+		shell('cutadapt {input.r1} {input.r2} -g {params.rv} -a {params.fwrc} -G {params.fw} -A {params.rvrc} --discard-untrimmed -n 2 -e 0.1 -m 75 --quality-base {params.ascii} -j {threads} -o {output.r1rv} -p {output.r2fw} >> {log}')
 
 rule quality_control:
 	input:
@@ -128,7 +128,7 @@ rule profiles:
 	input:
 		fwrv	= workpath + 'alignment/{sample}.fwrv.b6'
 	output:
-		fwrv	= workpath + 'profiles/{sample}.fwrv.tsv'
+		fwrv	= workpath + 'profiles/{sample}.fwrv.tsv',
 		fwrv_biom	= workpath + 'profiles/{sample}.fwrv.biom'
 	params:
 		sampleName='{sample}'
@@ -141,7 +141,7 @@ rule count:
 		r1_preQC 	= workpath + 'cutadapt/{sample}.r1fw.fq',
 		r2_preQC 	= workpath + 'cutadapt/{sample}.r2fw.fq',
 		r1_aftQC	= workpath + 'quality_control/{sample}.r1fw.fq',
-		r2_aftQC	= workpath + 'quality_control/{sample}.r2fw.fq'
+		r2_aftQC	= workpath + 'quality_control/{sample}.r2fw.fq',
 		alignment	= workpath + 'alignment/{sample}.fwrv.b6'
 	output:
 		count = workpath + 'count/{sample}.count'
