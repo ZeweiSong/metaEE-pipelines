@@ -110,18 +110,20 @@ rule alignment:
 		fw 		= workpath + 'merge/{sample}.fw.fa',
 		rv		= workpath + 'merge/{sample}.rv.fa'
 	output:
-		fw 		= temp(workpath + 'alignment/{sample}.fw.b6'),
-		rv		= temp(workpath + 'alignment/{sample}.rv.b6'),
+		fw 		= workpath + 'alignment/{sample}.fw.b6',
+		rv		= workpath + 'alignment/{sample}.rv.b6',
 		fwrv	= workpath + 'alignment/{sample}.fwrv.b6'
 	threads: 4
+	log:
+		workpath + 'logs/alignment/{sample}.log'	
 	params:
 		acx  = config['database']['acx'],
 		edx  = config['database']['edx'],
 		mode = config['align']['mode'],
 		id   = config['align']['id']
 	run:
-		shell('burst12 -q {input.fw} -a {params.acx} -r {params.edx} -o {output.fw} -i {params.id} -m {params.mode} -t {threads} > {log}')
-		shell('burst12 -q {input.rv} -a {params.acx} -r {params.edx} -o {output.rv} -i {params.id} -m {params.mode} -t {threads} > {log}')
+		shell('burst12 -q {input.fw} -a {params.acx} -r {params.edx} -o {output.fw} -i {params.id} -m {params.mode} -fr -t {threads} > {log}')
+		shell('burst12 -q {input.rv} -a {params.acx} -r {params.edx} -o {output.rv} -i {params.id} -m {params.mode} -fr -t {threads} > {log}')
 		shell('amplicon_keepPairAln.py -i {output.fw},{output.rv} -o {output.fwrv} > {log}')
 		
 rule profiles:
@@ -130,6 +132,8 @@ rule profiles:
 	output:
 		fwrv	= workpath + 'profiles/{sample}.fwrv.tsv',
 		fwrv_biom	= workpath + 'profiles/{sample}.fwrv.biom'
+	log:
+		workpath + 'logs/profiles/{sample}.log'
 	params:
 		sampleName='{sample}'
 	run:
@@ -145,6 +149,8 @@ rule count:
 		alignment	= workpath + 'alignment/{sample}.fwrv.b6'
 	output:
 		count = workpath + 'count/{sample}.count'
+	params:
+		name='{sample}'
 	run:
 		shell("c1=$(($(wc -l {input.r1_preQC} | awk '{{print $1}}')/4));c2=$(($(wc -l {input.r2_preQC} | awk '{{print $1}}')/4));c3=$(($(wc -l {input.r1_aftQC} | awk '{{print $1}}')/2));c4=$(($(wc -l {input.r2_aftQC} | awk '{{print $1}}')/4));c5=$(($(awk '{{print $1}}' {input.alignment} | wc -l  | awk '{{print $1}}')/4));echo -e {params.name} '\t' $c1 '\t' $c2 '\t' $c3 '\t' $c4 '\t' $c5 > {output.count}")
 		
@@ -154,7 +160,7 @@ rule concat:
 		count 	= expand(workpath + 'count/{sample}.count', sample=SAMPLES)
 	output:
 		combine_biom			= workpath + 'concat/' + project + '.biom',
-		comebin_taxa_biom		= workpath + 'concat/' + project + '.taxa.biom',
+		combine_taxa_biom		= workpath + 'concat/' + project + '.taxa.biom',
 		combine_taxa_tsv		= workpath + 'concat/' + project + '.taxa.tsv',
 		count 						= workpath + 'concat/' + project + '.summary'
 	params:
@@ -162,7 +168,7 @@ rule concat:
 	log:
 		workpath + 'logs/concat/concate.log'
 	run:
-		shell('amplicon_concat.py -i {input.fwrc} -biom_out {output.combine_fwrc_biom} > {log}')
-		shell('biom add-metadata -i {output.combine_fwrc_biom} -o {comebin_fwrc_taxa_biom} --observation-metadata-fp {params.taxa} --observation-header OTUID,taxonomy --output-as-json --sc-separated taxonomy')
-		shell('biom convert -i {comebin_fwrc_taxa_biom} -o {combine_fwrc_taxa_tsv} --to-tsv --header-key taxonomy')
+		shell('amplicon_concat.py -i {input.fwrv} -biom_out {output.combine_biom} > {log}')
+		shell('biom add-metadata -i {output.combine_biom} -o {output.combine_taxa_biom} --observation-metadata-fp {params.taxa} --observation-header OTUID,taxonomy --output-as-json --sc-separated taxonomy')
+		shell('biom convert -i {output.combine_taxa_biom} -o {output.combine_taxa_tsv} --to-tsv --header-key taxonomy')
 		shell('cat {input.count} > {output.count}')
